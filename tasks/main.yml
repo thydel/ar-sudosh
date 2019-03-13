@@ -1,0 +1,58 @@
+---
+
+- name: assert params
+  assert: that users is defined
+
+- name: set defaults
+  set_fact: { space: '{{ space_dir | default("/space") }}' }
+
+- name: sudosh block
+
+  vars:
+    sudo_io: '{{ space }}/var/log/sudo-io'
+    sudo_log: '{{ space }}/var/log/sudo.log'
+    sudosh: /usr/local/bin/sudosh
+
+  become: True
+
+  block:
+
+    - copy: { src: sudosh.py, dest: '{{ sudosh }}', mode: 0755 }
+      name: copy script
+    
+    - lineinfile: { path: /etc/shells, line: '{{ sudosh }}' }
+      name: add sudosh to shells
+    
+    - file: { path: '{{ item }}', state: directory }
+      loop: [ '{{ sudo_io }}', '{{ sudo_log | basename }}' ]
+      name: create log dirs
+    
+    - file: { state: link, src: '{{ sudo_io }}', dest: /var/log/sudo-io }
+      name: create symlink to sudo-io
+    
+    - group: { name: sudosh, system: True }
+      name: create group
+    
+    - copy: { content: '{{ all }}', dest: /etc/sudoers.d/sudosh, validate: /usr/sbin/visudo -cf %s }
+      name: create sudoers conf
+      vars:
+        defaults: |
+          Defaults: %sudosh log_input, log_output, iolog_dir={{ sudo_io }}, logfile={{ sudo_log }}
+          Defaults> %sudosh !requiretty
+        all: |
+          %sudosh ALL=(%sudosh) ALL
+          {{ defaults }}
+        ssh_only: |
+          %sudosh ALL=(%sudosh) SETENV: /bin/bash -c /usr/bin/ssh *.admin2 *
+          {{ defaults }}
+    
+    - file: { path: /usr/bin/chsh, mode: u-s }
+      name: remove setuid bit from chsh
+    
+    - user:
+        name: '{{ item }}'
+        append: True
+        groups: sudosh
+        shell: '{{ sudosh }}'
+      loop: '{{ users }}'
+      name: change users shell and add them in group
