@@ -1,10 +1,14 @@
 ---
 
+- { meta: noop, vars: { macros: &loo { delegate_to: localhost, run_once: True }}}
+
 - name: assert params
   assert: { that: users is defined }
+  <<: *loo
 
 - name: set defaults
   set_fact: { space: '{{ space_dir | default("/space") }}' }
+  <<: *loo
 
 - name: sudosh block
 
