@@ -1,7 +1,7 @@
 ---
 
 - name: assert params
-  assert: that users is defined
+  assert: { that: users is defined }
 
 - name: set defaults
   set_fact: { space: '{{ space_dir | default("/space") }}' }
